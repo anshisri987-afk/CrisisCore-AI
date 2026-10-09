@@ -1,0 +1,6 @@
+{
+  "name": "CrisisCore AI",
+  "description": "AI-Powered Emergency Resource Allocation & Disaster Response System",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

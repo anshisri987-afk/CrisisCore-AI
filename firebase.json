@@ -1,0 +1,8 @@
+{
+  "firestore": [
+    {
+      "database": "ai-studio-android-crisisco-0e853302-e5d3-42e9-9cfc-52a58033c28e",
+      "rules": "firestore.rules"
+    }
+  ]
+}

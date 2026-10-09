@@ -1,0 +1,119 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Authenticated user profile with role and emergency contact information",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["authority", "responder", "citizen", "coordinator"] },
+        "phone": { "type": "string" },
+        "language": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "name", "email", "role"]
+    },
+    "Incident": {
+      "title": "Incident",
+      "description": "Emergency incident report record with classification, priority score, and live status",
+      "type": "object",
+      "properties": {
+        "incidentId": { "type": "string" },
+        "reporterId": { "type": "string" },
+        "reporterName": { "type": "string" },
+        "title": { "type": "string" },
+        "type": { "type": "string", "enum": ["flood", "fire", "medical", "structural_collapse", "rescue_needed"] },
+        "severity": { "type": "string", "enum": ["critical", "high", "medium", "low"] },
+        "urgency": { "type": "string", "enum": ["immediate", "high", "normal"] },
+        "locationName": { "type": "string" },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "affectedPopulation": { "type": "number" },
+        "description": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "status": { "type": "string", "enum": ["reported", "classified", "prioritized", "resource_matched", "assigned", "responding", "resolved"] },
+        "priorityScore": { "type": "number" },
+        "assignedResourceId": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["incidentId", "reporterId", "title", "type", "severity", "latitude", "longitude", "status"]
+    },
+    "Resource": {
+      "title": "Resource",
+      "description": "Deployable emergency response assets including teams, vehicles, equipment and supplies",
+      "type": "object",
+      "properties": {
+        "resourceId": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["rescue_boat", "ambulance", "fire_engine", "response_team", "generator", "drone", "medical_kit", "food_water_pack"] },
+        "teamPersonnel": { "type": "string" },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "availability": { "type": "string", "enum": ["available", "dispatched", "en_route", "on_site", "maintenance"] },
+        "capacity": { "type": "number" },
+        "contactPhone": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["resourceId", "name", "type", "availability", "latitude", "longitude"]
+    },
+    "Assignment": {
+      "title": "Assignment",
+      "description": "Deployment link connecting matched resources to prioritized emergency incidents",
+      "type": "object",
+      "properties": {
+        "assignmentId": { "type": "string" },
+        "incidentId": { "type": "string" },
+        "resourceId": { "type": "string" },
+        "resourceName": { "type": "string" },
+        "incidentTitle": { "type": "string" },
+        "priority": { "type": "string" },
+        "routeSummary": { "type": "string" },
+        "etaMinutes": { "type": "number" },
+        "status": { "type": "string", "enum": ["assigned", "en_route", "on_scene", "completed", "reallocated"] },
+        "assignedAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["assignmentId", "incidentId", "resourceId", "status"]
+    },
+    "Alert": {
+      "title": "Alert",
+      "description": "Critical alerts, evacuation advisories and dynamic reallocation notifications",
+      "type": "object",
+      "properties": {
+        "alertId": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "severity": { "type": "string", "enum": ["critical", "warning", "advisory", "info"] },
+        "incidentId": { "type": "string" },
+        "targetRole": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["alertId", "title", "message", "severity", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Registered user profile records"
+    },
+    "/incidents/{incidentId}": {
+      "schema": { "$ref": "#/entities/Incident" },
+      "description": "Disaster incidents submitted by citizens or authorities"
+    },
+    "/resources/{resourceId}": {
+      "schema": { "$ref": "#/entities/Resource" },
+      "description": "Available and deployed emergency assets"
+    },
+    "/assignments/{assignmentId}": {
+      "schema": { "$ref": "#/entities/Assignment" },
+      "description": "Current resource allocations and assignments"
+    },
+    "/alerts/{alertId}": {
+      "schema": { "$ref": "#/entities/Alert" },
+      "description": "Broadcast emergency alerts and dynamic updates"
+    }
+  }
+}
