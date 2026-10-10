@@ -18,6 +18,7 @@ import {
   IncidentType,
   ResourceType
 } from '../types';
+import { sendPrompt, analyzeIncidentTriage } from '../services/geminiService';
 
 function nowIso(): string {
   const d = new Date();
@@ -423,20 +424,13 @@ export const CrisisProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     setFormState((prev) => ({ ...prev, isAnalyzing: true }));
     try {
-      const res = await fetch('/api/gemini/triage', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: formState.title || 'Unspecified Flood Emergency',
-          type: formState.type,
-          description: formState.description || 'Water rising rapidly, citizens trapped.',
-          waterDepthMeters: formState.waterDepthMeters,
-          affectedPopulation: formState.affectedPopulation
-        })
-      });
-
-      if (!res.ok) throw new Error('Failed to run triage');
-      const data = await res.json();
+      const data = await analyzeIncidentTriage(
+        formState.title || 'Unspecified Flood Emergency',
+        formState.type,
+        formState.description || 'Water rising rapidly, citizens trapped.',
+        formState.waterDepthMeters,
+        formState.affectedPopulation
+      );
 
       const sev = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].includes(data.severity)
         ? (data.severity as Severity)
@@ -454,27 +448,8 @@ export const CrisisProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }));
       showNotification(`AI Triage: Priority Score ${data.priorityScore}/100`);
     } catch (err: any) {
-      // Heuristic fallback
-      const calcScore = Math.min(
-        98,
-        Math.max(30, Math.round(formState.waterDepthMeters * 20 + formState.affectedPopulation * 2))
-      );
-      const fallbackResult = {
-        priorityScore: calcScore,
-        severity: calcScore > 80 ? 'CRITICAL' : 'HIGH',
-        urgency: formState.waterDepthMeters > 1.5 ? 'IMMEDIATE' : 'HIGH',
-        recommendedResource:
-          formState.waterDepthMeters > 0.8 ? 'Inflatable Rescue Boat' : 'NDRF Search & Rescue Team',
-        reasoning: `Rule-based evaluation: water depth ${formState.waterDepthMeters}m requires immediate evacuation.`
-      };
-      setFormState((prev) => ({
-        ...prev,
-        isAnalyzing: false,
-        severity: fallbackResult.severity as Severity,
-        urgency: fallbackResult.urgency as Urgency,
-        aiTriageSuggestion: fallbackResult
-      }));
-      showNotification(`AI Triage (Heuristic): Priority Score ${calcScore}/100`);
+      showNotification('AI Triage: Using calculated constraint baseline.');
+      setFormState((prev) => ({ ...prev, isAnalyzing: false }));
     }
   };
 
@@ -774,18 +749,11 @@ export const CrisisProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setIsChatLoading(true);
 
     try {
-      const res = await fetch('/api/gemini/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt,
-          mode: selectedGeminiMode,
-          history: currentHistory.map((m) => ({ sender: m.sender, text: m.text }))
-        })
-      });
-
-      const data = await res.json();
-      const replyText = data.text || 'Tactical guidance updated.';
+      const { text: replyText } = await sendPrompt(
+        prompt,
+        selectedGeminiMode,
+        currentHistory
+      );
 
       const modelMsg: ChatMessage = {
         id: `mod-${Date.now()}`,
