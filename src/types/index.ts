@@ -6,7 +6,8 @@ export type AppScreen =
   | 'ROUTE_TRACKING'
   | 'OPERATIONS_DASHBOARD'
   | 'AI_ASSISTANT'
-  | 'USER_PROFILE';
+  | 'USER_PROFILE'
+  | 'OFFLINE_BACKUP';
 
 export type UserRole =
   | 'DISASTER_AUTHORITY'

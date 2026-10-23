@@ -148,7 +148,19 @@ export const ResourceAllocationScreen: React.FC = () => {
         </div>
       </div>
 
-      {/* 3. Filter Row */}
+      {/* 3. Emergency Resource Cache Status */}
+      <div
+        data-testid="resource_offline_cache_badge"
+        className="flex items-center justify-between text-xs bg-[#0E1A2B] px-3 py-1.5 rounded-lg border border-[#223854]"
+      >
+        <span className="text-[#00C853] font-semibold flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-[#00C853] animate-pulse" />
+          <span>Service Worker Resource Cache Synchronized</span>
+        </span>
+        <span className="text-[#94A3B8] text-[11px] font-mono">{resources.length} emergency units available offline</span>
+      </div>
+
+      {/* 4. Filter Row */}
       <div className="flex flex-wrap gap-2">
         {(
           [

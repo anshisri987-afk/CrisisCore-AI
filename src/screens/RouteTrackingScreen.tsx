@@ -1,4 +1,9 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import {
+  Map,
+  AdvancedMarker,
+  useMap
+} from '@vis.gl/react-google-maps';
 import { useCrisis } from '../context/CrisisContext';
 import { INCIDENT_STATUSES } from '../types';
 import {
@@ -9,8 +14,94 @@ import {
   TrendingUp,
   Droplets,
   Flag,
-  Anchor
+  Anchor,
+  Shield
 } from 'lucide-react';
+
+interface WaypointItem {
+  distance: string;
+  title: string;
+  instruction: string;
+  icon: React.ComponentType<{ className?: string }>;
+  lat: number;
+  lng: number;
+}
+
+const WAYPOINTS_DATA: WaypointItem[] = [
+  {
+    distance: '0.0 km',
+    title: 'Depot Origin: NDRF Sector 1 Base',
+    instruction: 'Depart base via elevated service lane',
+    icon: MapPin,
+    lat: 28.6100,
+    lng: 77.2300
+  },
+  {
+    distance: '1.8 km',
+    title: 'Elevated Flyover Bypass',
+    instruction: 'Clear high ground; maintain green channel speed',
+    icon: TrendingUp,
+    lat: 28.6180,
+    lng: 77.2220
+  },
+  {
+    distance: '3.2 km',
+    title: 'Bund Entry Point C',
+    instruction: 'Water starts at 0.4m; lower boat engine draft',
+    icon: Droplets,
+    lat: 28.6220,
+    lng: 77.2190
+  },
+  {
+    distance: '4.1 km',
+    title: 'Hospital ICU Target Site',
+    instruction: 'Prepare stretchers and evacuation lifelines',
+    icon: Flag,
+    lat: 28.6250,
+    lng: 77.2180
+  }
+];
+
+// Inner component to render route polyline on Google Map
+const RouteNavigationPolyline: React.FC<{ waypoints: WaypointItem[] }> = ({ waypoints }) => {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map || typeof google === 'undefined' || !google.maps) return;
+
+    const pathCoordinates = waypoints.map((wp) => ({
+      lat: wp.lat,
+      lng: wp.lng
+    }));
+
+    // Glowing wider corridor line
+    const glowCorridor = new google.maps.Polyline({
+      path: pathCoordinates,
+      geodesic: true,
+      strokeColor: '#00C2E0',
+      strokeOpacity: 0.3,
+      strokeWeight: 8,
+      map
+    });
+
+    // Core solid navigation track
+    const routeTrack = new google.maps.Polyline({
+      path: pathCoordinates,
+      geodesic: true,
+      strokeColor: '#FF6B00',
+      strokeOpacity: 0.95,
+      strokeWeight: 4,
+      map
+    });
+
+    return () => {
+      glowCorridor.setMap(null);
+      routeTrack.setMap(null);
+    };
+  }, [map, waypoints]);
+
+  return null;
+};
 
 export const RouteTrackingScreen: React.FC = () => {
   const { assignments, incidents, selectedIncident, updateIncidentStatus } = useCrisis();
@@ -35,33 +126,6 @@ export const RouteTrackingScreen: React.FC = () => {
     '5. Assigned',
     '6. Responding',
     '7. Resolved'
-  ];
-
-  const waypoints = [
-    {
-      distance: '0.0 km',
-      title: 'Depot Origin: NDRF Sector 1',
-      instruction: 'Depart base via elevated service lane',
-      icon: MapPin
-    },
-    {
-      distance: '1.8 km',
-      title: 'Elevated Flyover Bypass',
-      instruction: 'Clear high ground; maintain green channel speed',
-      icon: TrendingUp
-    },
-    {
-      distance: '3.2 km',
-      title: 'Bund Entry Point C',
-      instruction: 'Water starts at 0.4m; lower boat engine draft',
-      icon: Droplets
-    },
-    {
-      distance: '4.1 km',
-      title: 'Hospital ICU Target Site',
-      instruction: 'Prepare stretchers and evacuation lifelines',
-      icon: Flag
-    }
   ];
 
   return (
@@ -102,9 +166,85 @@ export const RouteTrackingScreen: React.FC = () => {
             </p>
           </div>
         </div>
+
+        {/* Offline Cache Assurance Pill */}
+        <div
+          data-testid="offline_route_cache_pill"
+          className="flex items-center justify-between text-[11px] bg-[#070E18]/80 px-3 py-1.5 rounded-lg border border-[#223854]"
+        >
+          <span className="flex items-center gap-1.5 text-[#00C853] font-bold">
+            <span className="w-2 h-2 rounded-full bg-[#00C853] animate-pulse" />
+            <span>Service Worker Route Cache Armed</span>
+          </span>
+          <span className="text-[#94A3B8] font-mono text-[10px]">Turn-by-turn saved offline</span>
+        </div>
       </div>
 
-      {/* 2. Incident Lifecycle Progress Tracker */}
+      {/* 2. Interactive Google Maps Route Viewport */}
+      <div className="bg-[#0E1A2B] border border-[#223854] rounded-2xl overflow-hidden shadow-xl">
+        <div className="p-3 bg-[#070E18] border-b border-[#223854] flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Compass className="w-4 h-4 text-[#00C2E0]" />
+            <span className="text-xs font-bold text-white uppercase tracking-wider">
+              Google Maps Live Corridor GPS
+            </span>
+          </div>
+          <span className="text-[10px] font-bold text-[#00C853] bg-[#00C853]/10 px-2 py-0.5 rounded border border-[#00C853]/30">
+            GPS ACTIVE
+          </span>
+        </div>
+
+        <div className="relative w-full h-[280px]">
+          <Map
+            mapId="DEMO_MAP_ID"
+            internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
+            defaultCenter={{ lat: 28.618, lng: 77.222 }}
+            defaultZoom={13}
+            gestureHandling="greedy"
+            disableDefaultUI={false}
+            style={{ width: '100%', height: '100%' }}
+          >
+            <RouteNavigationPolyline waypoints={WAYPOINTS_DATA} />
+
+            {/* Waypoint Markers */}
+            {WAYPOINTS_DATA.map((wp, index) => {
+              const isOrigin = index === 0;
+              const isTarget = index === WAYPOINTS_DATA.length - 1;
+
+              return (
+                <AdvancedMarker
+                  key={index}
+                  position={{ lat: wp.lat, lng: wp.lng }}
+                  title={wp.title}
+                >
+                  <div className="cursor-pointer group flex flex-col items-center">
+                    <div
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold text-white flex items-center gap-1 shadow-md border ${
+                        isOrigin
+                          ? 'bg-[#00C853] border-white'
+                          : isTarget
+                          ? 'bg-[#E53935] border-white animate-pulse'
+                          : 'bg-[#FF6B00] border-white/70'
+                      }`}
+                    >
+                      {isOrigin ? (
+                        <Shield className="w-3 h-3" />
+                      ) : isTarget ? (
+                        <Flag className="w-3 h-3" />
+                      ) : (
+                        <span>{index + 1}</span>
+                      )}
+                      <span>{wp.distance}</span>
+                    </div>
+                  </div>
+                </AdvancedMarker>
+              );
+            })}
+          </Map>
+        </div>
+      </div>
+
+      {/* 3. Incident Lifecycle Progress Tracker */}
       <div
         data-testid="incident_lifecycle_timeline"
         className="bg-[#0E1A2B] border border-[#223854] rounded-xl p-4 sm:p-5 shadow-sm space-y-3"
@@ -161,7 +301,7 @@ export const RouteTrackingScreen: React.FC = () => {
         </div>
       </div>
 
-      {/* 3. Turn-by-Turn Waypoint Guidance */}
+      {/* 4. Turn-by-Turn Waypoint Guidance */}
       <div className="bg-[#0E1A2B] border border-[#223854] rounded-xl p-4 sm:p-5 shadow-sm space-y-3">
         <div className="flex items-center gap-2">
           <Compass className="w-4 h-4 text-[#00C2E0]" />
@@ -171,7 +311,7 @@ export const RouteTrackingScreen: React.FC = () => {
         </div>
 
         <div className="divide-y divide-[#223854]/60">
-          {waypoints.map((wp, idx) => {
+          {WAYPOINTS_DATA.map((wp, idx) => {
             const Icon = wp.icon;
             return (
               <div key={idx} className="py-2.5 first:pt-1 last:pb-1 flex items-start gap-3">
@@ -191,7 +331,7 @@ export const RouteTrackingScreen: React.FC = () => {
         </div>
       </div>
 
-      {/* 4. Responder Action Buttons */}
+      {/* 5. Responder Action Buttons */}
       {targetIncident && (
         <div
           data-testid="responder_action_panel"

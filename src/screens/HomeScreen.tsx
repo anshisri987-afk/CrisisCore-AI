@@ -13,7 +13,10 @@ import {
   Anchor,
   Loader2,
   Flame,
-  LifeBuoy
+  LifeBuoy,
+  Database,
+  Download,
+  ChevronRight
 } from 'lucide-react';
 
 export const HomeScreen: React.FC = () => {
@@ -25,7 +28,9 @@ export const HomeScreen: React.FC = () => {
     setScreen,
     selectIncident,
     runDynamicReallocationDemo,
-    isReallocating
+    isReallocating,
+    sqliteStats,
+    downloadSqliteBackup
   } = useCrisis();
 
   const activeIncidents = incidents.filter((i) => i.status !== 'RESOLVED');
@@ -214,6 +219,49 @@ export const HomeScreen: React.FC = () => {
           <BarChart3 className="w-4 h-4 text-[#00C853]" />
           <span className="text-xs font-semibold text-white">Analytics</span>
         </button>
+      </div>
+
+      {/* SQLite 3 Offline Backup & Vault Card */}
+      <div
+        data-testid="sqlite_offline_backup_card"
+        onClick={() => setScreen('OFFLINE_BACKUP')}
+        className="bg-gradient-to-r from-[#0E1A2B] via-[#122036] to-[#0E1A2B] border border-[#00C2E0]/40 rounded-xl p-3 cursor-pointer hover:border-[#00C2E0] transition flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg"
+      >
+        <div className="flex items-center gap-2.5">
+          <div className="p-2 rounded-lg bg-[#00C2E0]/15 text-[#00C2E0] border border-[#00C2E0]/30 shrink-0">
+            <Database className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-white tracking-wide">
+                SQLite 3 WASM Offline Backup Active
+              </span>
+              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-[#00C853]/20 text-[#00C853] border border-[#00C853]/30">
+                LOCAL ACID
+              </span>
+            </div>
+            <p className="text-[11px] text-[#94A3B8]">
+              {sqliteStats?.totalRows ?? (incidents.length + resources.length)} rows secured in IndexedDB mirror • Standalone .sqlite exports ready
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              downloadSqliteBackup();
+            }}
+            title="Download SQLite Database"
+            className="px-2.5 py-1 rounded-lg bg-[#16253B] hover:bg-[#1E3352] text-[#00C2E0] text-[11px] font-bold border border-[#223854] flex items-center gap-1 transition"
+          >
+            <Download className="w-3 h-3" />
+            <span>.sqlite</span>
+          </button>
+          <span className="text-xs text-[#00C2E0] font-bold flex items-center gap-0.5">
+            SQL Console <ChevronRight className="w-3.5 h-3.5" />
+          </span>
+        </div>
       </div>
 
       {/* 6. Priority Incident Feed Header */}

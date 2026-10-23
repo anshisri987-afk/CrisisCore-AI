@@ -1,17 +1,23 @@
 import React from 'react';
 import { useCrisis } from '../context/CrisisContext';
 import { USER_ROLES } from '../types';
-import { User, RefreshCw } from 'lucide-react';
+import { User, RefreshCw, Wifi, WifiOff, Database } from 'lucide-react';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import { PWAInstallButton } from './PWAInstallButton';
 
 export const CrisisTopAppBar: React.FC = () => {
   const {
     userRole,
     currentLanguage,
     toggleLanguage,
+    currentScreen,
     setScreen,
-    resetAllData
+    resetAllData,
+    syncEmergencyCache,
+    isSyncingCache
   } = useCrisis();
 
+  const isOnline = useOnlineStatus();
   const roleMeta = USER_ROLES[userRole];
 
   const getRoleBadgeColor = () => {
@@ -34,31 +40,79 @@ export const CrisisTopAppBar: React.FC = () => {
         className="flex items-center gap-3 cursor-pointer"
         onClick={() => setScreen('HOME')}
       >
-        <div className="relative flex items-center justify-center">
-          <span className="w-2.5 h-2.5 rounded-full bg-[#00C853] animate-pulse"></span>
-          <span className="absolute w-4 h-4 rounded-full bg-[#00C853]/30 animate-ping"></span>
+        {/* Main Brand Logo */}
+        <div className="relative flex items-center justify-center shrink-0">
+          <img
+            src="/assets/aistudio/WhatsApp_Image_2026-10-23_at_6.42.57_PM_4871f69a.jpeg"
+            alt="CrisisCore AI Official Logo"
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl object-contain bg-black border border-[#FF6B00]/40 shadow-md shadow-[#FF6B00]/10"
+          />
+          <span
+            className={`absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#070E18] ${
+              isOnline ? 'bg-[#00C853] animate-pulse' : 'bg-[#FF6B00]'
+            }`}
+          />
         </div>
         <div>
-          <h1 className="text-base sm:text-lg font-black tracking-wider text-white leading-tight">
-            CRISISCORE AI
-          </h1>
-          <p className="text-[10px] font-semibold text-[#00C2E0] uppercase tracking-wide">
-            {currentLanguage === 'HI'
-              ? 'आपदा प्रतिक्रिया प्रणाली'
-              : 'URBAN FLOOD COMMAND • SENSE → ADAPT'}
-          </p>
+          <div className="flex items-center gap-2">
+            <h1 className="text-base sm:text-lg font-black tracking-wider text-white leading-tight">
+              CRISISCORE AI
+            </h1>
+
+            {/* Network / Offline Cache Badge */}
+            <span
+              data-testid="connectivity_status_pill"
+              className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                isOnline
+                  ? 'bg-[#00C853]/15 text-[#00C853] border-[#00C853]/30'
+                  : 'bg-[#FF6B00]/20 text-[#FF6B00] border-[#FF6B00]/40 animate-pulse'
+              }`}
+            >
+              {isOnline ? (
+                <>
+                  <Wifi className="w-3 h-3" />
+                  <span>ONLINE</span>
+                </>
+              ) : (
+                <>
+                  <WifiOff className="w-3 h-3" />
+                  <span>OFFLINE CACHED</span>
+                </>
+              )}
+            </span>
+          </div>
         </div>
       </div>
 
       {/* Actions */}
       <div className="flex items-center gap-2">
-        {/* Reset / Baseline Helper */}
+        {/* In-App PWA Install Button */}
+        <PWAInstallButton compact />
+
+        {/* Sync Emergency Cache Helper */}
         <button
-          onClick={resetAllData}
-          title="Reset Baseline Telemetry"
+          onClick={syncEmergencyCache}
+          disabled={isSyncingCache}
+          title="Sync Emergency Resources & Routes Cache"
+          data-testid="sync_cache_button"
           className="p-1.5 rounded-lg border border-[#223854] text-[#94A3B8] hover:text-[#00C2E0] hover:border-[#00C2E0]/40 transition text-xs flex items-center"
         >
-          <RefreshCw className="w-3.5 h-3.5" />
+          <RefreshCw className={`w-3.5 h-3.5 ${isSyncingCache ? 'animate-spin text-[#00C2E0]' : ''}`} />
+        </button>
+
+        {/* SQLite Offline Backup & Query Button */}
+        <button
+          onClick={() => setScreen('OFFLINE_BACKUP')}
+          data-testid="sqlite_backup_topbar_button"
+          title="SQLite Offline Backup & Query Console"
+          className={`p-1.5 rounded-lg border transition text-xs flex items-center gap-1 ${
+            currentScreen === 'OFFLINE_BACKUP'
+              ? 'border-[#00C2E0] bg-[#00C2E0]/20 text-[#00C2E0]'
+              : 'border-[#223854] text-[#94A3B8] hover:text-[#00C2E0] hover:border-[#00C2E0]/40'
+          }`}
+        >
+          <Database className="w-3.5 h-3.5 text-[#00C2E0]" />
+          <span className="hidden sm:inline text-[10px] font-bold tracking-wider">SQLITE</span>
         </button>
 
         {/* Language Toggle */}

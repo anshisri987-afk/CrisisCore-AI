@@ -3,6 +3,7 @@ import { useCrisis } from './context/CrisisContext';
 import { CrisisTopAppBar } from './components/CrisisTopAppBar';
 import { CrisisBottomNavigation } from './components/CrisisBottomNavigation';
 import { SnackbarNotification } from './components/SnackbarNotification';
+import { OfflineIndicator } from './components/OfflineIndicator';
 import { AuthScreen } from './screens/AuthScreen';
 import { HomeScreen } from './screens/HomeScreen';
 import { SituationalMapScreen } from './screens/SituationalMapScreen';
@@ -12,6 +13,7 @@ import { RouteTrackingScreen } from './screens/RouteTrackingScreen';
 import { DashboardScreen } from './screens/DashboardScreen';
 import { CrisisChatScreen } from './screens/CrisisChatScreen';
 import { UserProfileScreen } from './screens/UserProfileScreen';
+import { OfflineBackupScreen } from './screens/OfflineBackupScreen';
 
 export const App: React.FC = () => {
   const { isAuthenticated, currentScreen } = useCrisis();
@@ -21,6 +23,7 @@ export const App: React.FC = () => {
       <>
         <AuthScreen />
         <SnackbarNotification />
+        <OfflineIndicator />
       </>
     );
   }
@@ -38,10 +41,12 @@ export const App: React.FC = () => {
         {currentScreen === 'OPERATIONS_DASHBOARD' && <DashboardScreen />}
         {currentScreen === 'AI_ASSISTANT' && <CrisisChatScreen />}
         {currentScreen === 'USER_PROFILE' && <UserProfileScreen />}
+        {currentScreen === 'OFFLINE_BACKUP' && <OfflineBackupScreen />}
       </main>
 
       <CrisisBottomNavigation />
       <SnackbarNotification />
+      <OfflineIndicator />
     </div>
   );
 };

@@ -19,6 +19,22 @@ import {
   ResourceType
 } from '../types';
 import { sendPrompt, analyzeIncidentTriage } from '../services/geminiService';
+import {
+  cacheEmergencyData,
+  getCachedEmergencyResources,
+  getCachedCriticalRoutes,
+  getOfflineCacheMeta,
+  queueOfflineIncident,
+  getQueuedOfflineIncidents,
+  clearQueuedOfflineIncidents,
+  OfflineCacheMeta,
+  CriticalRouteCacheItem
+} from '../services/offlineCacheService';
+import {
+  sqliteBackupService,
+  SQLiteStats,
+  SQLiteQueryResult
+} from '../services/sqliteBackupService';
 
 function nowIso(): string {
   const d = new Date();
@@ -286,6 +302,20 @@ interface CrisisContextType {
   clearStatusMessage: () => void;
   showNotification: (msg: string) => void;
   resetAllData: () => void;
+
+  criticalRoutes: CriticalRouteCacheItem[];
+  offlineMeta: OfflineCacheMeta | null;
+  queuedIncidentsCount: number;
+  syncEmergencyCache: () => Promise<void>;
+  isSyncingCache: boolean;
+
+  sqliteStats: SQLiteStats | null;
+  isSqliteReady: boolean;
+  refreshSqliteStats: () => Promise<void>;
+  downloadSqliteBackup: (filename?: string) => Promise<string>;
+  restoreSqliteBackupFromFile: (fileData: Uint8Array, fileName: string) => Promise<{ success: boolean; message: string }>;
+  executeSqliteQuery: (sql: string) => Promise<SQLiteQueryResult>;
+  syncStateToSQLiteManual: () => Promise<void>;
 }
 
 const CrisisContext = createContext<CrisisContextType | null>(null);
@@ -352,9 +382,67 @@ export const CrisisProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [selectedGeminiMode, setSelectedGeminiMode] = useState<GeminiMode>('BALANCED_GENERAL');
   const [isChatLoading, setIsChatLoading] = useState(false);
 
-  // Status snackbar & loading flags
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isReallocating, setIsReallocating] = useState(false);
+
+  // Offline service worker & emergency data cache state
+  const [criticalRoutes] = useState<CriticalRouteCacheItem[]>(getCachedCriticalRoutes());
+  const [offlineMeta, setOfflineMeta] = useState<OfflineCacheMeta | null>(getOfflineCacheMeta());
+  const [queuedIncidentsCount, setQueuedIncidentsCount] = useState<number>(() => getQueuedOfflineIncidents().length);
+  const [isSyncingCache, setIsSyncingCache] = useState(false);
+
+  // Initial precache & online/offline listeners
+  useEffect(() => {
+    cacheEmergencyData(resources, assignments).then(setOfflineMeta);
+
+    const handleOnline = () => {
+      const queued = getQueuedOfflineIncidents();
+      if (queued.length > 0) {
+        showNotification(`Network reconnected! Synchronized ${queued.length} offline incident(s).`);
+        clearQueuedOfflineIncidents();
+        setQueuedIncidentsCount(0);
+      } else {
+        showNotification('Network reconnected. Emergency telemetry live.');
+      }
+    };
+
+    const handleOffline = () => {
+      showNotification('Network offline. Emergency resource & route cache activated.');
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Synchronize cache when resources or assignments change
+  useEffect(() => {
+    cacheEmergencyData(resources, assignments).then(setOfflineMeta);
+  }, [resources, assignments]);
+
+  const syncEmergencyCache = async () => {
+    setIsSyncingCache(true);
+    try {
+      const meta = await cacheEmergencyData(resources, assignments);
+      setOfflineMeta(meta);
+      const queued = getQueuedOfflineIncidents();
+      if (queued.length > 0) {
+        showNotification(`Synced ${queued.length} offline report(s) & updated emergency cache.`);
+        clearQueuedOfflineIncidents();
+        setQueuedIncidentsCount(0);
+      } else {
+        showNotification(`Emergency cache armed: ${meta.resourceCount} resources & ${meta.routeCount} routes cached.`);
+      }
+    } catch {
+      showNotification('Emergency cache updated.');
+    } finally {
+      setIsSyncingCache(false);
+    }
+  };
 
   // Save to localStorage
   useEffect(() => {
@@ -376,6 +464,86 @@ export const CrisisProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => {
     localStorage.setItem('crisiscore_auth', isAuthenticated ? 'true' : 'false');
   }, [isAuthenticated]);
+
+  // SQLite Offline Backup & Query Engine State
+  const [sqliteStats, setSqliteStats] = useState<SQLiteStats | null>(null);
+  const [isSqliteReady, setIsSqliteReady] = useState(false);
+
+  // Synchronize to SQLite WASM database whenever domain state changes
+  useEffect(() => {
+    let isCancelled = false;
+    sqliteBackupService
+      .syncStateToSQLite({
+        incidents,
+        resources,
+        assignments,
+        alerts,
+        routes: criticalRoutes
+      })
+      .then(() => {
+        if (!isCancelled) {
+          sqliteBackupService.getStats().then((stats) => {
+            if (!isCancelled) {
+              setSqliteStats(stats);
+              setIsSqliteReady(stats.isInitialized);
+            }
+          });
+        }
+      })
+      .catch((err) => {
+        console.warn('SQLite background synchronization warning:', err);
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [incidents, resources, assignments, alerts, criticalRoutes]);
+
+  const refreshSqliteStats = async () => {
+    const stats = await sqliteBackupService.getStats();
+    setSqliteStats(stats);
+    setIsSqliteReady(stats.isInitialized);
+  };
+
+  const downloadSqliteBackup = async (filename?: string): Promise<string> => {
+    const downloadedName = await sqliteBackupService.downloadSQLiteFile(filename);
+    await refreshSqliteStats();
+    return downloadedName;
+  };
+
+  const restoreSqliteBackupFromFile = async (
+    fileData: Uint8Array,
+    fileName: string
+  ): Promise<{ success: boolean; message: string }> => {
+    const res = await sqliteBackupService.restoreFromBinaryFile(fileData, fileName);
+    if (res.success) {
+      if (res.incidents.length > 0) setIncidents(res.incidents);
+      if (res.resources.length > 0) setResources(res.resources);
+      if (res.assignments.length > 0) setAssignments(res.assignments);
+      if (res.alerts.length > 0) setAlerts(res.alerts);
+      await refreshSqliteStats();
+      showNotification(`Restored ${res.incidents.length} incidents and ${res.resources.length} resources from ${fileName}`);
+      return { success: true, message: `Successfully restored ${res.incidents.length} incidents` };
+    } else {
+      showNotification(`Restore failed: ${res.error}`);
+      return { success: false, message: res.error || 'Restore failed' };
+    }
+  };
+
+  const executeSqliteQuery = async (sql: string): Promise<SQLiteQueryResult> => {
+    return await sqliteBackupService.executeQuery(sql);
+  };
+
+  const syncStateToSQLiteManual = async (): Promise<void> => {
+    await sqliteBackupService.syncStateToSQLite({
+      incidents,
+      resources,
+      assignments,
+      alerts,
+      routes: criticalRoutes
+    });
+    await refreshSqliteStats();
+  };
 
   const showNotification = (msg: string) => {
     setStatusMessage(msg);
@@ -499,7 +667,17 @@ export const CrisisProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
 
     setIncidents((prev) => [newInc, ...prev]);
-    showNotification('Incident reported & classified successfully!');
+
+    // Push directly to SQLite table & offline queue
+    sqliteBackupService.queueIncidentInSQLite(newInc).catch(console.warn);
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      queueOfflineIncident(newInc);
+      setQueuedIncidentsCount((prev) => prev + 1);
+      showNotification('Offline mode: Incident saved in SQLite database and queued for network sync.');
+    } else {
+      showNotification('Incident reported, classified & written to SQLite database!');
+    }
 
     // Reset Form
     setFormState({
@@ -832,7 +1010,19 @@ export const CrisisProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         statusMessage,
         clearStatusMessage,
         showNotification,
-        resetAllData
+        resetAllData,
+        criticalRoutes,
+        offlineMeta,
+        queuedIncidentsCount,
+        syncEmergencyCache,
+        isSyncingCache,
+        sqliteStats,
+        isSqliteReady,
+        refreshSqliteStats,
+        downloadSqliteBackup,
+        restoreSqliteBackupFromFile,
+        executeSqliteQuery,
+        syncStateToSQLiteManual
       }}
     >
       {children}

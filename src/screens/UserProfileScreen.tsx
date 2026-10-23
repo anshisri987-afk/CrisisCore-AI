@@ -1,7 +1,7 @@
 import React from 'react';
 import { useCrisis } from '../context/CrisisContext';
 import { UserRole, USER_ROLES } from '../types';
-import { User, LogOut, PhoneCall } from 'lucide-react';
+import { User, LogOut, PhoneCall, Database, Download, ChevronRight } from 'lucide-react';
 
 export const UserProfileScreen: React.FC = () => {
   const {
@@ -10,7 +10,10 @@ export const UserProfileScreen: React.FC = () => {
     setUserRole,
     currentLanguage,
     toggleLanguage,
-    logout
+    logout,
+    setScreen,
+    sqliteStats,
+    downloadSqliteBackup
   } = useCrisis();
 
   const roles: UserRole[] = [
@@ -137,7 +140,72 @@ export const UserProfileScreen: React.FC = () => {
         </div>
       </div>
 
-      {/* 5. Sign Out Button */}
+      {/* 5. Offline SQLite Database & Backup Center */}
+      <div
+        data-testid="user_profile_sqlite_card"
+        className="bg-[#0E1A2B] border border-[#223854] rounded-xl p-4 sm:p-5 shadow-sm space-y-3"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Database className="w-4 h-4 text-[#00C2E0]" />
+            <h4 className="text-xs sm:text-sm font-bold text-white uppercase tracking-wider">
+              Offline SQLite Engine & Backup
+            </h4>
+          </div>
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#00C853]/20 text-[#00C853] border border-[#00C853]/30">
+            WASM ACTIVE
+          </span>
+        </div>
+
+        <p className="text-xs text-[#94A3B8]">
+          Embedded relational database storing all incident telemetry, disaster resources, active dispatches, and emergency routing waypoints directly on device with zero internet dependency.
+        </p>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+          <div className="text-xs text-[#CBD5E1]">
+            <span className="text-[#00C2E0] font-bold font-mono">{sqliteStats?.totalRows ?? 0}</span> cached records • <span className="text-[#FFB300] font-bold font-mono">{sqliteStats?.totalTables ?? 6}</span> tables
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => downloadSqliteBackup()}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#16253B] hover:bg-[#1E3352] text-xs font-bold text-[#00C2E0] border border-[#223854] transition"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Export .sqlite</span>
+            </button>
+            <button
+              onClick={() => setScreen('OFFLINE_BACKUP')}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#00C2E0] hover:bg-[#00ADC8] text-xs font-bold text-[#070E18] transition shadow"
+            >
+              <span>Open SQL Console</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Official System Badge with Logo */}
+      <div className="bg-[#0E1A2B] border border-[#223854] rounded-xl p-4 flex items-center gap-3.5 shadow-sm">
+        <img
+          src="/assets/aistudio/WhatsApp_Image_2026-10-23_at_6.42.57_PM_4871f69a.jpeg"
+          alt="CrisisCore AI Official Logo"
+          className="w-12 h-12 rounded-xl object-contain bg-black border border-[#FF6B00]/40 shrink-0 shadow-md"
+        />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs sm:text-sm font-black tracking-wider text-white">CRISISCORE AI</span>
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#FF6B00]/20 text-[#FF6B00] border border-[#FF6B00]/30 uppercase">
+              OFFICIAL SYSTEM
+            </span>
+          </div>
+          <p className="text-[11px] text-[#94A3B8] mt-0.5 leading-snug">
+            Autonomous Emergency Resource Allocation & Multi-Hazard Disaster Response Platform.
+          </p>
+        </div>
+      </div>
+
+      {/* 6. Sign Out Button */}
       <button
         onClick={logout}
         data-testid="sign_out_button"

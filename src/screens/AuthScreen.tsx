@@ -30,16 +30,18 @@ export const AuthScreen: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#070E18] flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-[#0E1A2B] border border-[#223854] rounded-2xl p-6 sm:p-8 shadow-2xl flex flex-col items-center text-center space-y-6">
-        {/* App Icon */}
-        <div className="w-24 h-24 rounded-full bg-[#0E1A2B] border-2 border-[#FF6B00] flex items-center justify-center p-2 overflow-hidden shadow-lg shadow-[#FF6B00]/10">
-          <img
-            src="/crisiscore_icon.jpg"
-            alt="CrisisCore AI Shield"
-            className="w-full h-full object-cover rounded-full"
-            onError={(e) => {
-              (e.currentTarget as HTMLElement).style.display = 'none';
-            }}
-          />
+        {/* Official App Logo */}
+        <div className="relative group">
+          <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-2xl bg-black border-2 border-[#FF6B00]/70 flex items-center justify-center p-2.5 overflow-hidden shadow-2xl shadow-[#FF6B00]/20 ring-4 ring-[#FF6B00]/10 transition-transform duration-300 group-hover:scale-105">
+            <img
+              src="/assets/aistudio/WhatsApp_Image_2026-10-23_at_6.42.57_PM_4871f69a.jpeg"
+              alt="CrisisCore AI Official Logo"
+              className="w-full h-full object-contain"
+            />
+          </div>
+          <span className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 px-2.5 py-0.5 rounded-full bg-[#FF6B00] text-[9px] font-black uppercase tracking-widest text-white shadow-md border border-white/20 whitespace-nowrap">
+            OFFICIAL SYSTEM
+          </span>
         </div>
 
         {/* Branding */}

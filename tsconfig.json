@@ -13,6 +13,7 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
+    "types": ["vite/client", "vite-plugin-pwa/client", "node", "google.maps"],
 
     /* Linting */
     "strict": true,
