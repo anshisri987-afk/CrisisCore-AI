@@ -1,7 +1,7 @@
 import React from 'react';
 import { useCrisis } from '../context/CrisisContext';
 import { USER_ROLES } from '../types';
-import { User, RefreshCw, Wifi, WifiOff, Database } from 'lucide-react';
+import { User, RefreshCw, Wifi, WifiOff, Database, Cloud } from 'lucide-react';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { PWAInstallButton } from './PWAInstallButton';
 
@@ -14,7 +14,10 @@ export const CrisisTopAppBar: React.FC = () => {
     setScreen,
     resetAllData,
     syncEmergencyCache,
-    isSyncingCache
+    isSyncingCache,
+    isFirebaseConnected,
+    isCloudSyncing,
+    syncAllToFirestore
   } = useCrisis();
 
   const isOnline = useOnlineStatus();
@@ -113,6 +116,24 @@ export const CrisisTopAppBar: React.FC = () => {
         >
           <Database className="w-3.5 h-3.5 text-[#00C2E0]" />
           <span className="hidden sm:inline text-[10px] font-bold tracking-wider">SQLITE</span>
+        </button>
+
+        {/* Cloud Firestore Sync Button */}
+        <button
+          onClick={syncAllToFirestore}
+          disabled={isCloudSyncing}
+          data-testid="cloud_sync_topbar_button"
+          title={isFirebaseConnected ? 'Firebase Cloud Connected (crisiscore-ai-c8e27)' : 'Sync to Firebase Firestore'}
+          className={`p-1.5 rounded-lg border transition text-xs flex items-center gap-1 ${
+            isFirebaseConnected
+              ? 'border-[#FF6B00]/60 bg-[#FF6B00]/15 text-[#FF6B00]'
+              : 'border-[#223854] text-[#94A3B8] hover:text-[#FF6B00] hover:border-[#FF6B00]/40'
+          }`}
+        >
+          <Cloud className={`w-3.5 h-3.5 ${isCloudSyncing ? 'animate-bounce text-[#FF6B00]' : ''}`} />
+          <span className="hidden sm:inline text-[10px] font-bold tracking-wider">
+            {isCloudSyncing ? 'SYNCING' : 'CLOUD'}
+          </span>
         </button>
 
         {/* Language Toggle */}

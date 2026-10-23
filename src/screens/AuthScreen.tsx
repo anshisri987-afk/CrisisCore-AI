@@ -4,16 +4,19 @@ import { UserRole, USER_ROLES } from '../types';
 import { Shield, Lock } from 'lucide-react';
 
 export const AuthScreen: React.FC = () => {
-  const { login } = useCrisis();
+  const { login, signInWithGoogleAuth, isFirebaseConnected } = useCrisis();
   const [selectedRole, setSelectedRole] = useState<UserRole>('DISASTER_AUTHORITY');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleGoogleSignIn = () => {
+  const handleGoogleSignIn = async () => {
     setIsLoading(true);
-    setTimeout(() => {
+    try {
+      await signInWithGoogleAuth(selectedRole);
+    } catch {
+      // handled inside signInWithGoogleAuth fallback
+    } finally {
       setIsLoading(false);
-      login('commander.delhi@crisiscore.gov.in', selectedRole);
-    }, 600);
+    }
   };
 
   const handleDemoAccess = () => {

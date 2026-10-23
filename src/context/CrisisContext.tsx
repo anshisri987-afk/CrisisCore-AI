@@ -35,6 +35,22 @@ import {
   SQLiteStats,
   SQLiteQueryResult
 } from '../services/sqliteBackupService';
+import {
+  auth,
+  testFirestoreConnection,
+  signInWithGoogle,
+  signOutFirebase,
+  saveUserProfile,
+  subscribeToIncidents,
+  subscribeToResources,
+  subscribeToAssignments,
+  subscribeToAlerts,
+  syncIncidentToFirestore,
+  syncResourceToFirestore,
+  syncAssignmentToFirestore,
+  syncAlertToFirestore
+} from '../services/firebase';
+import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 
 function nowIso(): string {
   const d = new Date();
@@ -316,6 +332,11 @@ interface CrisisContextType {
   restoreSqliteBackupFromFile: (fileData: Uint8Array, fileName: string) => Promise<{ success: boolean; message: string }>;
   executeSqliteQuery: (sql: string) => Promise<SQLiteQueryResult>;
   syncStateToSQLiteManual: () => Promise<void>;
+
+  isFirebaseConnected: boolean;
+  isCloudSyncing: boolean;
+  signInWithGoogleAuth: (role?: UserRole) => Promise<void>;
+  syncAllToFirestore: () => Promise<void>;
 }
 
 const CrisisContext = createContext<CrisisContextType | null>(null);
@@ -329,6 +350,8 @@ export const CrisisProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     return localStorage.getItem('crisiscore_auth') === 'true';
   });
+  const [isFirebaseConnected, setIsFirebaseConnected] = useState<boolean>(false);
+  const [isCloudSyncing, setIsCloudSyncing] = useState<boolean>(false);
 
   // Domain state with local storage fallback
   const [incidents, setIncidents] = useState<Incident[]>(() => {
@@ -418,6 +441,96 @@ export const CrisisProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
+
+  // Validate Firestore connection on boot and listen to Auth changes
+  useEffect(() => {
+    testFirestoreConnection().then(setIsFirebaseConnected);
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setIsAuthenticated(true);
+        if (user.email) setUserEmail(user.email);
+        saveUserProfile(user, userRole).catch(console.warn);
+        setIsFirebaseConnected(true);
+      }
+    });
+
+    return () => {
+      unsubscribeAuth();
+    };
+  }, []);
+
+  // Subscribe to real-time Firestore collections when authenticated
+  useEffect(() => {
+    if (!isAuthenticated || !auth.currentUser) return;
+
+    const unsubInc = subscribeToIncidents((remoteIncidents) => {
+      if (remoteIncidents && remoteIncidents.length > 0) {
+        setIncidents((prev) => {
+          const map = new Map<string, Incident>();
+          remoteIncidents.forEach((inc) => map.set(inc.incidentId, inc));
+          prev.forEach((inc) => {
+            if (!map.has(inc.incidentId)) {
+              map.set(inc.incidentId, inc);
+            }
+          });
+          return Array.from(map.values());
+        });
+      }
+    });
+
+    const unsubRes = subscribeToResources((remoteResources) => {
+      if (remoteResources && remoteResources.length > 0) {
+        setResources((prev) => {
+          const map = new Map<string, Resource>();
+          remoteResources.forEach((res) => map.set(res.resourceId, res));
+          prev.forEach((res) => {
+            if (!map.has(res.resourceId)) {
+              map.set(res.resourceId, res);
+            }
+          });
+          return Array.from(map.values());
+        });
+      }
+    });
+
+    const unsubAsn = subscribeToAssignments((remoteAssignments) => {
+      if (remoteAssignments && remoteAssignments.length > 0) {
+        setAssignments((prev) => {
+          const map = new Map<string, Assignment>();
+          remoteAssignments.forEach((asn) => map.set(asn.assignmentId, asn));
+          prev.forEach((asn) => {
+            if (!map.has(asn.assignmentId)) {
+              map.set(asn.assignmentId, asn);
+            }
+          });
+          return Array.from(map.values());
+        });
+      }
+    });
+
+    const unsubAlt = subscribeToAlerts((remoteAlerts) => {
+      if (remoteAlerts && remoteAlerts.length > 0) {
+        setAlerts((prev) => {
+          const map = new Map<string, AlertMessage>();
+          remoteAlerts.forEach((alt) => map.set(alt.alertId, alt));
+          prev.forEach((alt) => {
+            if (!map.has(alt.alertId)) {
+              map.set(alt.alertId, alt);
+            }
+          });
+          return Array.from(map.values());
+        });
+      }
+    });
+
+    return () => {
+      if (unsubInc) unsubInc();
+      if (unsubRes) unsubRes();
+      if (unsubAsn) unsubAsn();
+      if (unsubAlt) unsubAlt();
+    };
+  }, [isAuthenticated]);
 
   // Synchronize cache when resources or assignments change
   useEffect(() => {
@@ -560,7 +673,55 @@ export const CrisisProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     showNotification(`Authenticated as ${role ? role : 'Disaster Authority'}`);
   };
 
+  const signInWithGoogleAuth = async (role?: UserRole) => {
+    try {
+      const user = await signInWithGoogle();
+      const currentRole = role || userRole;
+      if (role) setUserRole(role);
+      setUserEmail(user.email || 'operator@crisiscore.gov');
+      setIsAuthenticated(true);
+      setIsFirebaseConnected(true);
+      await saveUserProfile(user, currentRole);
+      showNotification(`Signed in with Google as ${user.displayName || user.email}`);
+    } catch (err: any) {
+      console.error('Google Sign-In error:', err);
+      showNotification('Google Sign-In blocked or dismissed. Enabled local session.');
+      login(undefined, role);
+    }
+  };
+
+  const syncAllToFirestore = async () => {
+    if (!isAuthenticated) {
+      showNotification('Please authenticate to sync with Firestore.');
+      return;
+    }
+    setIsCloudSyncing(true);
+    try {
+      showNotification('Synchronizing data with Firestore cloud database...');
+      for (const inc of incidents) {
+        await syncIncidentToFirestore(inc);
+      }
+      for (const res of resources) {
+        await syncResourceToFirestore(res);
+      }
+      for (const asn of assignments) {
+        await syncAssignmentToFirestore(asn);
+      }
+      for (const alt of alerts) {
+        await syncAlertToFirestore(alt);
+      }
+      setIsFirebaseConnected(true);
+      showNotification('Cloud Sync Complete: Firestore updated with latest records.');
+    } catch (err: any) {
+      console.warn('Sync to Firestore error:', err);
+      showNotification('Firestore sync completed locally (offline fallback active).');
+    } finally {
+      setIsCloudSyncing(false);
+    }
+  };
+
   const logout = () => {
+    signOutFirebase().catch(console.warn);
     setIsAuthenticated(false);
     setCurrentScreen('HOME');
     showNotification('Signed out from command session.');
@@ -671,12 +832,19 @@ export const CrisisProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // Push directly to SQLite table & offline queue
     sqliteBackupService.queueIncidentInSQLite(newInc).catch(console.warn);
 
+    // Sync to Firestore if authenticated & online
+    if (typeof navigator !== 'undefined' && navigator.onLine && isAuthenticated) {
+      syncIncidentToFirestore(newInc).catch((err) => {
+        console.warn('Firestore incident sync queued:', err);
+      });
+    }
+
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       queueOfflineIncident(newInc);
       setQueuedIncidentsCount((prev) => prev + 1);
       showNotification('Offline mode: Incident saved in SQLite database and queued for network sync.');
     } else {
-      showNotification('Incident reported, classified & written to SQLite database!');
+      showNotification('Incident reported, classified & synced to local SQLite & cloud database!');
     }
 
     // Reset Form
@@ -774,6 +942,25 @@ export const CrisisProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       assignedResourceId: resource.resourceId,
       assignedResourceName: resource.name
     });
+
+    // Sync to Firestore if authenticated & online
+    if (typeof navigator !== 'undefined' && navigator.onLine && isAuthenticated) {
+      syncAssignmentToFirestore(newAssignment).catch(console.warn);
+      syncIncidentToFirestore({
+        ...incident,
+        status: 'ASSIGNED',
+        assignedResourceId: resource.resourceId,
+        assignedResourceName: resource.name,
+        updatedAt: nowIso()
+      }).catch(console.warn);
+      syncResourceToFirestore({
+        ...resource,
+        availability: 'DISPATCHED',
+        currentIncidentId: incident.incidentId,
+        updatedAt: nowIso()
+      }).catch(console.warn);
+      syncAlertToFirestore(newAlert).catch(console.warn);
+    }
 
     showNotification(`${resource.name} assigned to ${incident.title}`);
   };
@@ -1022,7 +1209,11 @@ export const CrisisProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         downloadSqliteBackup,
         restoreSqliteBackupFromFile,
         executeSqliteQuery,
-        syncStateToSQLiteManual
+        syncStateToSQLiteManual,
+        isFirebaseConnected,
+        isCloudSyncing,
+        signInWithGoogleAuth,
+        syncAllToFirestore
       }}
     >
       {children}

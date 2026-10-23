@@ -1,7 +1,7 @@
 import React from 'react';
 import { useCrisis } from '../context/CrisisContext';
 import { UserRole, USER_ROLES } from '../types';
-import { User, LogOut, PhoneCall, Database, Download, ChevronRight } from 'lucide-react';
+import { User, LogOut, PhoneCall, Database, Download, ChevronRight, Cloud, RefreshCw } from 'lucide-react';
 
 export const UserProfileScreen: React.FC = () => {
   const {
@@ -13,7 +13,11 @@ export const UserProfileScreen: React.FC = () => {
     logout,
     setScreen,
     sqliteStats,
-    downloadSqliteBackup
+    downloadSqliteBackup,
+    isFirebaseConnected,
+    isCloudSyncing,
+    syncAllToFirestore,
+    signInWithGoogleAuth
   } = useCrisis();
 
   const roles: UserRole[] = [
@@ -140,7 +144,52 @@ export const UserProfileScreen: React.FC = () => {
         </div>
       </div>
 
-      {/* 5. Offline SQLite Database & Backup Center */}
+      {/* 5. Cloud Firestore & Multi-Device Sync */}
+      <div
+        data-testid="user_profile_firebase_card"
+        className="bg-[#0E1A2B] border border-[#223854] rounded-xl p-4 sm:p-5 shadow-sm space-y-3"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Cloud className="w-4 h-4 text-[#FF6B00]" />
+            <h4 className="text-xs sm:text-sm font-bold text-white uppercase tracking-wider">
+              Firebase Cloud Firestore Sync
+            </h4>
+          </div>
+          <span
+            className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+              isFirebaseConnected
+                ? 'bg-[#00C853]/20 text-[#00C853] border-[#00C853]/30'
+                : 'bg-[#FFB300]/20 text-[#FFB300] border-[#FFB300]/30'
+            }`}
+          >
+            {isFirebaseConnected ? 'CLOUD CONNECTED' : 'OFFLINE-READY'}
+          </span>
+        </div>
+
+        <p className="text-xs text-[#94A3B8]">
+          Connected to Firebase Project <span className="text-white font-mono font-bold">crisiscore-ai-c8e27</span>. Live multi-device syncing for incidents, resource deployments, and emergency alerts.
+        </p>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+          <div className="text-xs text-[#CBD5E1]">
+            <span className="text-[#00C2E0] font-bold">Collections:</span> /incidents, /resources, /assignments, /alerts, /users
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => syncAllToFirestore()}
+              disabled={isCloudSyncing}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#FF6B00] hover:bg-[#E05E00] text-xs font-bold text-white transition shadow disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isCloudSyncing ? 'animate-spin' : ''}`} />
+              <span>{isCloudSyncing ? 'Syncing...' : 'Sync to Cloud (Firestore)'}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 6. Offline SQLite Database & Backup Center */}
       <div
         data-testid="user_profile_sqlite_card"
         className="bg-[#0E1A2B] border border-[#223854] rounded-xl p-4 sm:p-5 shadow-sm space-y-3"
