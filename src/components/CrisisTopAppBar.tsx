@@ -3,7 +3,6 @@ import { useCrisis } from '../context/CrisisContext';
 import { USER_ROLES } from '../types';
 import { User, RefreshCw, Wifi, WifiOff, Database, Cloud } from 'lucide-react';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
-import { PWAInstallButton } from './PWAInstallButton';
 
 export const CrisisTopAppBar: React.FC = () => {
   const {
@@ -89,9 +88,6 @@ export const CrisisTopAppBar: React.FC = () => {
 
       {/* Actions */}
       <div className="flex items-center gap-2">
-        {/* In-App PWA Install Button */}
-        <PWAInstallButton compact />
-
         {/* Sync Emergency Cache Helper */}
         <button
           onClick={syncEmergencyCache}
